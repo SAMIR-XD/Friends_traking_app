@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bondhu-map-v3';
+const CACHE_NAME = 'bondhu-map-v4';
 const APP_SHELL = [
   './index.html',
   './manifest.json',
@@ -6,12 +6,19 @@ const APP_SHELL = [
   './icons/icon-512.png'
 ];
 
-// Install: pre-cache the app shell
+// Install: pre-cache the app shell (add files individually so one
+// missing/renamed asset doesn't fail the whole install step)
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      return Promise.all(
+        APP_SHELL.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn('[SW] could not cache', url, err);
+          })
+        )
+      );
+    }).then(() => self.skipWaiting())
   );
 });
 
