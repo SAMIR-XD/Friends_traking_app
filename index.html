@@ -251,6 +251,13 @@
     font-family:inherit;
   }
   .mod-btn:active{background:rgba(217,105,79,0.3);}
+  .msg-del{
+    color:var(--danger);
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+  .thread-del-btn{flex-shrink:0;}
 
   .pin-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;}
   .pin-label{
@@ -624,6 +631,20 @@
   const ADMIN_NAMES = ['sami', 'junaed sami', 'জুনায়েদ সামি', 'সামি'];
   function isAdmin(){
     return !!myName && ADMIN_NAMES.includes(myName.trim().toLowerCase());
+  }
+
+  // Join with one of these names and your live location is never written
+  // to the shared database — nobody (including admin) can see your pin,
+  // but you still see everyone else's. Change/add names here freely.
+  const GHOST_NAMES = ['ghost'];
+  function isGhost(){
+    return !!myName && GHOST_NAMES.includes(myName.trim().toLowerCase());
+  }
+
+  // Local, per-device list of removed personal-message threads (admin only)
+  let removedThreads = new Set(JSON.parse(localStorage.getItem('removed-threads') || '[]'));
+  function saveRemovedThreads(){
+    localStorage.setItem('removed-threads', JSON.stringify(Array.from(removedThreads)));
   }
 
   const $ = (sel) => document.querySelector(sel);
@@ -1009,6 +1030,7 @@
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       myLat = lat; myLng = lng;
+      if(isGhost()) return; // ghost mode: track locally, never broadcast
       db.ref('locations/' + safeKey(myName)).update({
         name: myName, lat, lng, timestamp: now
       });
@@ -1044,23 +1066,32 @@
   function sortedMsgs(obj){
     return Object.values(obj || {}).sort((a,b)=> a.timestamp - b.timestamp);
   }
+  function sortedMsgEntries(obj){
+    return Object.entries(obj || {}).sort((a,b)=> a[1].timestamp - b[1].timestamp);
+  }
 
   function listenGroupChat(){
     db.ref('groupchat').limitToLast(300).on('value', (snap)=>{
-      const msgs = sortedMsgs(snap.val());
+      const entries = sortedMsgEntries(snap.val());
       const box = $('#groupMsgs');
       const wasAtBottom = isNearBottom(box);
       box.innerHTML = '';
-      if(!msgs.length){
+      if(!entries.length){
         box.innerHTML = `<div class="empty-state"><div class="glyph">💬</div><div>এখনো কোনো মেসেজ নেই।<br>প্রথম মেসেজটা তুমিই দাও!</div></div>`;
         return;
       }
-      msgs.forEach(m=>{
+      const amAdmin = isAdmin();
+      entries.forEach(([key, m])=>{
         const mine = m.from === myName;
         const row = document.createElement('div');
         row.className = 'msg-row ' + (mine?'mine':'theirs');
-        row.innerHTML = `${!mine?`<div class="msg-sender">${escapeHtml(m.from)}</div>`:''}<div class="msg-bubble">${escapeHtml(m.text)}</div><div class="msg-meta">${fmtTime(m.timestamp)}</div>`;
+        row.innerHTML = `${!mine?`<div class="msg-sender">${escapeHtml(m.from)}</div>`:''}<div class="msg-bubble">${escapeHtml(m.text)}</div><div class="msg-meta">${fmtTime(m.timestamp)}${amAdmin?' · <span class="msg-del">মুছো</span>':''}</div>`;
         box.appendChild(row);
+        if(amAdmin){
+          row.querySelector('.msg-del').addEventListener('click', ()=>{
+            if(confirm('এই মেসেজটা মুছে দিতে চাও?')) db.ref('groupchat/' + key).remove();
+          });
+        }
       });
       if(wasAtBottom) scrollToBottom('groupMsgs');
     });
@@ -1079,17 +1110,32 @@
   // ---------- Private Threads ----------
   function renderThreadList(){
     const list = $('#threadList');
-    const members = Array.from(knownThreadMembers);
+    const members = Array.from(knownThreadMembers).filter(n => !removedThreads.has(n));
     list.innerHTML = '';
     if(!members.length){
       list.innerHTML = `<div class="empty-state"><div class="glyph">✉️</div><div>এখনো অন্য কোনো বন্ধু যোগ দেয়নি।<br>ফাইলটা শেয়ার করো!</div></div>`;
       return;
     }
+    const amAdmin = isAdmin();
     members.forEach(name=>{
       const item = document.createElement('div');
       item.className = 'thread-item';
-      item.innerHTML = `<div class="avatar">${name.charAt(0)}</div><div><div class="tname">${escapeHtml(name)}</div><div class="tsub" id="preview-${safeKey(name)}">মেসেজ শুরু করো</div></div>`;
-      item.addEventListener('click', ()=> openThread(name));
+      item.innerHTML = `<div class="avatar">${name.charAt(0)}</div><div style="flex:1;min-width:0;"><div class="tname">${escapeHtml(name)}</div><div class="tsub" id="preview-${safeKey(name)}">মেসেজ শুরু করো</div></div>`
+        + (amAdmin ? `<button class="mod-btn thread-del-btn" type="button">🚫 রিমুভ</button>` : '');
+      item.addEventListener('click', (e)=>{
+        if(e.target.closest('.thread-del-btn')) return;
+        openThread(name);
+      });
+      if(amAdmin){
+        item.querySelector('.thread-del-btn').addEventListener('click', (e)=>{
+          e.stopPropagation();
+          if(!confirm(`${name}-এর সাথে পুরো মেসেজ হিস্ট্রি মুছে দিতে চাও?`)) return;
+          db.ref(threadPath(myName, name)).remove();
+          removedThreads.add(name);
+          saveRemovedThreads();
+          renderThreadList();
+        });
+      }
       list.appendChild(item);
       db.ref(threadPath(myName, name)).limitToLast(1).on('value', (snap)=>{
         const msgs = sortedMsgs(snap.val());
@@ -1119,20 +1165,27 @@
 
   function listenThread(name){
     db.ref(threadPath(myName, name)).limitToLast(300).on('value', (snap)=>{
-      const msgs = sortedMsgs(snap.val());
+      const entries = sortedMsgEntries(snap.val());
       const box = $('#threadMsgs');
       const wasAtBottom = isNearBottom(box);
       box.innerHTML = '';
-      if(!msgs.length){
+      if(!entries.length){
         box.innerHTML = `<div class="empty-state"><div class="glyph">✉️</div><div>${escapeHtml(name)}-কে প্রথম মেসেজ দাও!</div></div>`;
         return;
       }
-      msgs.forEach(m=>{
+      const amAdmin = isAdmin();
+      const path = threadPath(myName, name);
+      entries.forEach(([key, m])=>{
         const mine = m.from === myName;
         const row = document.createElement('div');
         row.className = 'msg-row ' + (mine?'mine':'theirs');
-        row.innerHTML = `<div class="msg-bubble">${escapeHtml(m.text)}</div><div class="msg-meta">${fmtTime(m.timestamp)}</div>`;
+        row.innerHTML = `<div class="msg-bubble">${escapeHtml(m.text)}</div><div class="msg-meta">${fmtTime(m.timestamp)}${amAdmin?' · <span class="msg-del">মুছো</span>':''}</div>`;
         box.appendChild(row);
+        if(amAdmin){
+          row.querySelector('.msg-del').addEventListener('click', ()=>{
+            if(confirm('এই মেসেজটা মুছে দিতে চাও?')) db.ref(path + '/' + key).remove();
+          });
+        }
       });
       if(wasAtBottom) scrollToBottom('threadMsgs');
     });
