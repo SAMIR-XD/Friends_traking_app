@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>বন্ধু ম্যাপ</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#122127">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="বন্ধু ম্যাপ">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#122127;
+    --surface:#1b2e35;
+    --surface-2:#233c44;
+    --line: rgba(237,230,218,0.10);
+    --amber:#e8a33d;
+    --amber-soft: rgba(232,163,61,0.16);
+    --teal:#4fa88f;
+    --rose:#e8637c;
+    --paper:#ede6da;
+    --muted:#93a9ad;
+    --danger:#d9694f;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 10% 6%, rgba(232,163,61,0.18) 0, transparent 36%),
+      radial-gradient(circle at 92% 10%, rgba(232,99,124,0.16) 0, transparent 34%),
+      radial-gradient(circle at 100% 70%, rgba(79,168,143,0.14) 0, transparent 40%),
+      radial-gradient(circle at 0% 90%, rgba(232,163,61,0.10) 0, transparent 42%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'Hind Siliguri', sans-serif;
+    overflow:hidden;
+  }
+  #app{
+    height:100vh;
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    max-width:560px;
+    margin:0 auto;
+    position:relative;
+    background:transparent;
+  }
+
+  /* ---- Header ---- */
+  header{
+    padding:16px 18px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand .title{
+    font-family:'Baloo Da 2',sans-serif;
+    font-weight:700;
+    font-size:20px;
+    color:var(--paper);
+    letter-spacing:0.2px;
+  }
+  .brand .sub{font-size:12px;color:var(--muted);}
+  .me-pill{
+    display:flex;align-items:center;gap:8px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:13px;
+    color:var(--amber);
+    font-weight:600;
+  }
+  .dot-live{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--teal);
+    box-shadow:0 0 0 0 rgba(79,168,143,0.6);
+    animation:pulse 2s infinite;
+  }
+  .header-right{display:flex;align-items:center;gap:8px;}
+  .exit-btn{
+    width:34px;height:34px;flex-shrink:0;
+    border-radius:50%;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--rose);
+    font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .exit-btn:active{transform:scale(0.9);background:var(--surface);}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(79,168,143,0.55);}
+    70%{box-shadow:0 0 0 8px rgba(79,168,143,0);}
+    100%{box-shadow:0 0 0 0 rgba(79,168,143,0);}
+  }
+
+  /* ---- Views ---- */
+  main{flex:1;min-height:0;position:relative;}
+  .view{
+    position:absolute;inset:0;
+    display:none;
+    flex-direction:column;
+    min-height:0;
+  }
+  .view.active{display:flex;}
+
+  /* Onboarding */
+  #view-onboard.active{justify-content:center;align-items:center;padding:28px;}
+  .onboard-card{
+    width:100%;
+    text-align:center;
+  }
+  .onboard-card .glyph{
+    font-size:40px;margin-bottom:10px;
+  }
+  .welcome-line{
+    font-family:'Baloo Da 2',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--amber);
+    margin-bottom:6px;
+    letter-spacing:0.2px;
+  }
+  .onboard-card h1{
+    font-family:'Noto Naskh Arabic','Baloo Da 2',sans-serif;
+    font-weight:700;
+    font-size:28px;margin:0 0 6px;
+    background:linear-gradient(90deg,var(--amber),var(--rose));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    direction:rtl;
+  }
+  .onboard-card p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 22px;}
+  .onboard-card input{
+    width:100%;
+    padding:14px 16px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--paper);
+    font-size:16px;
+    font-family:inherit;
+    margin-bottom:14px;
+    outline:none;
+  }
+  .onboard-card input:focus{border-color:var(--amber);}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;
+    padding:14px 16px;
+    border-radius:14px;
+    border:none;
+    background:linear-gradient(90deg,var(--amber),var(--rose));
+    color:#20140a;
+    font-weight:700;
+    font-size:15px;
+    font-family:inherit;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(232,99,124,0.25);
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn.secondary{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--paper);
+    font-weight:600;
+    box-shadow:none;
+  }
+  .hint{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;}
+  .social-row{
+    display:flex;justify-content:center;gap:10px;
+    margin-top:16px;
+  }
+  .social-row a{
+    width:40px;height:40px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    font-size:18px;
+    text-decoration:none;
+    transition:transform 0.15s ease;
+  }
+  .social-row a:active{transform:scale(0.9);}
+  .credit-pill{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    padding:7px 14px;
+    border-radius:999px;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:18px;
+  }
+  .credit-pill strong{color:var(--amber);font-weight:700;}
+  .credit-pill .dot-live{width:6px;height:6px;}
+
+  /* Map view */
+  #view-map.active{display:flex;}
+  .map-wrap{flex:1;min-height:0;position:relative;}
+  #map{height:100%;width:100%;}
+  .leaflet-container{background:var(--surface);}
+  .who-strip{
+    display:flex;gap:8px;padding:10px 12px;overflow-x:auto;
+    border-top:1px solid var(--line);
+    background:var(--surface);
+    flex-shrink:0;
+  }
+  .who-strip::-webkit-scrollbar{display:none;}
+  .who-chip{
+    flex-shrink:0;
+    display:flex;flex-direction:column;
+    padding:8px 12px;
+    border-radius:12px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    min-width:96px;
+    cursor:pointer;
+  }
+  .who-chip:active{background:var(--surface);}
+  .who-chip .name{font-size:13px;font-weight:600;color:var(--paper);}
+  .who-chip .meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .who-chip.me{border-color:var(--amber);}
+  .who-chip.stale .meta{color:var(--danger);}
+  .mod-btn{
+    margin-top:5px;
+    align-self:flex-start;
+    background:rgba(217,105,79,0.15);
+    border:1px solid rgba(217,105,79,0.4);
+    color:var(--danger);
+    font-size:10.5px;
+    font-weight:600;
+    border-radius:8px;
+    padding:2px 7px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .mod-btn:active{background:rgba(217,105,79,0.3);}
+
+  .pin-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;}
+  .pin-label{
+    font-family:'Hind Siliguri',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    color:#20140a;
+    background:var(--amber);
+    padding:2px 8px;
+    border-radius:8px;
+    white-space:nowrap;
+    box-shadow:0 2px 6px rgba(0,0,0,0.35);
+  }
+  .pin-label.me{background:var(--teal);}
+  .pin-label.dest{background:var(--danger);color:#fff;}
+  .pin-sub{
+    font-family:'Hind Siliguri',sans-serif;
+    font-size:10px;
+    font-weight:500;
+    color:var(--paper);
+    background:rgba(18,33,39,0.9);
+    padding:1px 7px;
+    border-radius:6px;
+    white-space:nowrap;
+    box-shadow:0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Dark-themed Leaflet popups */
+  .leaflet-popup-content-wrapper{background:var(--surface-2);color:var(--paper);border-radius:12px;}
+  .leaflet-popup-tip{background:var(--surface-2);}
+  .leaflet-popup-content{margin:10px 12px;font-family:'Hind Siliguri',sans-serif;}
+  a.leaflet-popup-close-button{color:var(--paper) !important;}
+
+  /* Destination bar */
+  .dest-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:10px 14px;
+    background:var(--amber-soft);
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+    cursor:pointer;
+  }
+  .dest-bar-info{display:flex;align-items:center;gap:10px;min-width:0;}
+  .dest-flag{font-size:18px;flex-shrink:0;}
+  .dest-bar-text{min-width:0;}
+  .dest-name{font-size:13px;font-weight:700;color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dest-meta{font-size:11px;color:var(--muted);margin-top:1px;}
+  .dest-clear{
+    background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;
+    padding:4px 8px;flex-shrink:0;
+  }
+
+  /* Floating action button to set destination */
+  .fab-dest{
+    position:absolute;right:14px;bottom:14px;
+    background:linear-gradient(135deg,var(--amber),var(--rose));color:#20140a;
+    border:none;border-radius:999px;
+    padding:11px 16px;
+    font-weight:700;font-size:13px;font-family:inherit;
+    box-shadow:0 4px 14px rgba(0,0,0,0.4);
+    display:flex;align-items:center;gap:6px;
+    cursor:pointer;z-index:500;
+  }
+  .fab-dest:active{transform:scale(0.97);}
+
+  /* Destination search overlay (Google-Maps-style place search) */
+  .dest-search-overlay{
+    position:fixed;inset:0;
+    background:var(--ink);
+    z-index:2000;
+    display:none;flex-direction:column;
+    max-width:560px;margin:0 auto;
+  }
+  .dest-search-overlay.active{display:flex;}
+  .dest-search-header{
+    display:flex;align-items:center;gap:10px;
+    padding:14px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .dest-search-header input{
+    flex:1;
+    padding:12px 14px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--paper);
+    font-family:inherit;
+    font-size:15px;
+    outline:none;
+  }
+  .dest-search-header input:focus{border-color:var(--amber);}
+  .dest-search-results{flex:1;overflow-y:auto;padding:6px 10px;}
+  .dest-result-item{
+    padding:12px 10px;
+    border-radius:12px;
+    cursor:pointer;
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .dest-result-item:active{background:var(--surface-2);}
+  .dest-result-main{font-size:14px;font-weight:600;color:var(--paper);}
+  .dest-result-sub{font-size:12px;color:var(--muted);}
+  .dest-search-loading, .dest-search-empty{
+    padding:24px;text-align:center;color:var(--muted);font-size:13px;
+  }
+
+  /* Chat views */
+  .chat-view{padding:0;}
+  .chat-header{
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;
+    flex-shrink:0;
+  }
+  .chat-header .h{font-weight:700;font-size:15px;}
+  .thread-list{
+    padding:8px 12px;
+    overflow-y:auto;
+    flex:1;
+  }
+  .thread-item{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 10px;
+    border-radius:12px;
+    cursor:pointer;
+  }
+  .thread-item:active{background:var(--surface-2);}
+  .avatar{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:var(--amber);
+    flex-shrink:0;
+    border:1px solid var(--line);
+  }
+  .thread-item .tname{font-weight:600;font-size:14px;}
+  .thread-item .tsub{font-size:12px;color:var(--muted);margin-top:1px;}
+
+  .msgs{
+    flex:1;overflow-y:auto;
+    padding:14px 14px 6px;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .msg-row{display:flex;flex-direction:column;max-width:78%;}
+  .msg-row.mine{align-self:flex-end;align-items:flex-end;}
+  .msg-row.theirs{align-self:flex-start;align-items:flex-start;}
+  .msg-bubble{
+    padding:9px 13px;
+    border-radius:16px;
+    font-size:14px;
+    line-height:1.5;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+  }
+  .msg-row.mine .msg-bubble{
+    background:var(--amber-soft);
+    border-color:rgba(232,163,61,0.35);
+  }
+  .msg-meta{font-size:11px;color:var(--muted);margin-top:3px;padding:0 3px;}
+  .msg-sender{font-size:11px;color:var(--teal);font-weight:700;margin-bottom:2px;padding:0 3px;}
+
+  .composer{
+    display:flex;gap:8px;
+    padding:10px 12px;
+    border-top:1px solid var(--line);
+    flex-shrink:0;
+    background:var(--ink);
+  }
+  .composer input{
+    flex:1;
+    padding:12px 14px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--paper);
+    font-family:inherit;
+    font-size:14px;
+    outline:none;
+  }
+  .composer input:focus{border-color:var(--amber);}
+  .send-btn{
+    width:44px;height:44px;flex-shrink:0;
+    border-radius:12px;
+    border:none;background:linear-gradient(135deg,var(--amber),var(--rose));
+    color:#20140a;font-size:18px;font-weight:700;
+    cursor:pointer;
+  }
+  .back-btn{
+    background:none;border:none;color:var(--paper);
+    font-size:20px;cursor:pointer;padding:4px 6px;
+  }
+
+  /* Bottom nav */
+  nav{
+    display:flex;
+    border-top:1px solid var(--line);
+    background:var(--surface);
+    flex-shrink:0;
+  }
+  nav button{
+    flex:1;
+    background:none;border:none;
+    padding:11px 4px 9px;
+    color:var(--muted);
+    font-family:inherit;
+    font-size:11.5px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    cursor:pointer;
+  }
+  nav button .icon{font-size:19px;}
+  nav button.active{color:var(--amber);}
+
+  .empty-state{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:var(--muted);text-align:center;padding:30px;gap:8px;
+  }
+  .empty-state .glyph{font-size:32px;}
+
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:var(--surface-2);border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ONBOARDING -->
+  <div class="view active" id="view-onboard">
+    <div class="onboard-card">
+      <div class="glyph">🧭</div>
+      <div class="welcome-line">Welcome dear brother 👋</div>
+      <h1>السلام عليكم</h1>
+      <p>আল্লাহ তায়ালা সবার উপর পাঁচ ওয়াক্ত নামাজ ফরজ করেছেন।</p>
+      <input id="nameInput" type="text" placeholder="তোমার নাম লেখো (যেমন: সামি)" maxlength="20">
+      <button class="btn" id="joinBtn">শুরু করি →</button>
+      <div class="social-row">
+        <a href="https://www.facebook.com/profile.php?id=61576412756346" target="_blank" rel="noopener" aria-label="Facebook">📘</a>
+        <a href="https://wa.me/8801918090729" target="_blank" rel="noopener" aria-label="WhatsApp">💬</a>
+        <a href="https://www.instagram.com/junaed_sami_" target="_blank" rel="noopener" aria-label="Instagram">📸</a>
+        <a href="https://t.me/junaed_sami" target="_blank" rel="noopener" aria-label="Telegram">✈️</a>
+        <a href="https://github.com/SAMIR-XD" target="_blank" rel="noopener" aria-label="GitHub">🐙</a>
+      </div>
+      <div class="credit-pill"><span class="dot-live"></span>তৈরি করেছেন <strong>জুনায়েদ সামি</strong></div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="view" id="view-map">
+    <header>
+      <div class="brand">
+        <div class="title" style="font-family:'Noto Naskh Arabic','Baloo Da 2',sans-serif;direction:rtl;">🧭 سُبْحَانَ ٱللَّٰهِ</div>
+        <div class="sub" id="memberCount">লোড হচ্ছে...</div>
+      </div>
+      <div class="header-right">
+        <div class="me-pill"><span class="dot-live"></span><span id="meLabel"></span></div>
+        <button class="exit-btn" id="exitBtn" title="বের হও">🚪</button>
+      </div>
+    </header>
+    <div class="dest-bar" id="destBar" style="display:none;">
+      <div class="dest-bar-info">
+        <span class="dest-flag">🎯</span>
+        <div class="dest-bar-text">
+          <div class="dest-name" id="destName"></div>
+          <div class="dest-meta" id="destMeta"></div>
+        </div>
+      </div>
+      <button class="dest-clear" id="destClearBtn">✕</button>
+    </div>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <button class="fab-dest" id="destFabBtn">🎯 গন্তব্য ঠিক করো</button>
+    </div>
+    <div class="who-strip" id="whoStrip"></div>
+    <nav>
+      <button class="active" data-view="map"><span class="icon">🗺️</span>ম্যাপ</button>
+      <button data-view="group"><span class="icon">💬</span>গ্রুপ চ্যাট</button>
+      <button data-view="private"><span class="icon">✉️</span>পার্সোনাল</button>
+    </nav>
+  </div>
+
+  <!-- DESTINATION SEARCH OVERLAY -->
+  <div class="dest-search-overlay" id="destSearchOverlay">
+    <div class="dest-search-header">
+      <button class="back-btn" id="destSearchBack">←</button>
+      <input type="text" id="destSearchInput" placeholder="জায়গার নাম লিখো (যেমন: গুলশান ২, ঢাকা)">
+    </div>
+    <div class="dest-search-results" id="destSearchResults"></div>
+  </div>
+
+  <!-- GROUP CHAT -->
+  <div class="view chat-view" id="view-group">
+    <div class="chat-header">
+      <div class="h">💬 গ্রুপ চ্যাট — Everyone can see this</div>
+    </div>
+    <div class="msgs" id="groupMsgs"></div>
+    <div class="composer">
+      <input type="text" id="groupInput" placeholder="মেসেজ লেখো..." maxlength="500">
+      <button class="send-btn" id="groupSendBtn">➤</button>
+    </div>
+    <nav>
+      <button data-view="map"><span class="icon">🗺️</span>ম্যাপ</button>
+      <button class="active" data-view="group"><span class="icon">💬</span>গ্রুপ চ্যাট</button>
+      <button data-view="private"><span class="icon">✉️</span>পার্সোনাল</button>
+    </nav>
+  </div>
+
+  <!-- PRIVATE THREAD LIST -->
+  <div class="view chat-view" id="view-private">
+    <div class="chat-header">
+      <div class="h">✉️ পার্সোনাল মেসেজ</div>
+    </div>
+    <div class="thread-list" id="threadList"></div>
+    <nav>
+      <button data-view="map"><span class="icon">🗺️</span>ম্যাপ</button>
+      <button data-view="group"><span class="icon">💬</span>গ্রুপ চ্যাট</button>
+      <button class="active" data-view="private"><span class="icon">✉️</span>পার্সোনাল</button>
+    </nav>
+  </div>
+
+  <!-- PRIVATE THREAD -->
+  <div class="view chat-view" id="view-thread">
+    <div class="chat-header">
+      <button class="back-btn" id="threadBackBtn">←</button>
+      <div class="h" id="threadTitle"></div>
+      <div style="width:26px;"></div>
+    </div>
+    <div class="msgs" id="threadMsgs"></div>
+    <div class="composer">
+      <input type="text" id="threadInput" placeholder="মেসেজ লেখো..." maxlength="500">
+      <button class="send-btn" id="threadSendBtn">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-database-compat.min.js"></script>
+<script>
+(function(){
+  const firebaseConfig = {
+    apiKey: "AIzaSyA2Usy3Iw38MOOS0bDX-kJYT89obaE1e2E",
+    authDomain: "friends-group-tracker.firebaseapp.com",
+    databaseURL: "https://friends-group-tracker-default-rtdb.firebaseio.com",
+    projectId: "friends-group-tracker",
+    storageBucket: "friends-group-tracker.firebasestorage.app",
+    messagingSenderId: "400663325432",
+    appId: "1:400663325432:web:7d68a1c4f9a6e02476a90d"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let myName = null;
+  let map, markersLayer;
+  const markers = {};
+  let currentThreadWith = null;
+  let watchId = null;
+  let lastWriteTs = 0;
+  let lastGeoTs = 0;
+  const WRITE_THROTTLE_MS = 8000;
+  const GEOCODE_THROTTLE_MS = 45000;
+  const STALE_MS = 5 * 60 * 1000;
+  const knownThreadMembers = new Set();
+  let latestLocations = {};
+  let myLat = null, myLng = null;
+  let destMarker = null;
+  let currentDestination = null;
+  let destSearchDebounce = null;
+
+  // Only these names get moderation powers (remove/block members).
+  // Matching is case-insensitive and trims spaces.
+  const ADMIN_NAMES = ['sami', 'junaed sami', 'জুনায়েদ সামি', 'সামি'];
+  function isAdmin(){
+    return !!myName && ADMIN_NAMES.includes(myName.trim().toLowerCase());
+  }
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  function fmtTime(ts){
+    const d = new Date(ts);
+    return d.toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'});
+  }
+
+  function safeKey(name){
+    return name.replace(/[.#$\[\]\/]/g, '_');
+  }
+  function threadPath(a,b){
+    return 'private/' + [safeKey(a), safeKey(b)].sort().join('__');
+  }
+
+  async function reverseGeocode(lat, lng){
+    try{
+      // zoom=18 pulls street/locality level detail instead of just the থানা/উপজেলা
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+      if(!res.ok) return null;
+      const data = await res.json();
+      const a = data.address || {};
+
+      // Most specific "locality" piece first — this is the Google-Maps-style area name
+      const locality = a.neighbourhood || a.suburb || a.quarter || a.village
+                     || a.hamlet || a.residential || a.city_district || '';
+
+      // Street-level detail, when available, to sit alongside the locality
+      const street = a.road || a.pedestrian || '';
+
+      // Broader place for context (town/city/উপজেলা)
+      const broader = a.town || a.city || a.municipality || a.county || a.state || '';
+
+      const parts = [];
+      if(street) parts.push(street);
+      if(locality && locality !== street) parts.push(locality);
+      if(parts.length === 0 && broader) parts.push(broader);
+      else if(broader && broader !== locality && broader !== street) parts.push(broader);
+
+      if(parts.length) return parts.slice(0, 2).join(', ');
+      return data.display_name ? data.display_name.split(',').slice(0,2).join(',').trim() : null;
+    }catch(e){
+      console.warn('reverse geocode failed', e);
+      return null;
+    }
+  }
+
+  $('#exitBtn').addEventListener('click', leaveApp);
+
+  function leaveApp(){
+    const ok = confirm('তুমি কি বের হয়ে যেতে চাও? তোমার লোকেশন শেয়ারিং বন্ধ হয়ে যাবে আর তুমি ম্যাপ থেকে সরে যাবে।');
+    if(!ok) return;
+
+    // stop sending my live location
+    if(watchId !== null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+
+    // remove my pin from everyone's map
+    if(myName){
+      db.ref('locations/' + safeKey(myName)).remove();
+    }
+
+    // stop listening to everything
+    db.ref('locations').off();
+    db.ref('groupchat').off();
+    db.ref('members').off();
+    db.ref('destination').off();
+    if(currentThreadWith){
+      db.ref(threadPath(myName, currentThreadWith)).off();
+    }
+
+    // clear saved session
+    localStorage.removeItem('me-name');
+    myName = null;
+    myLat = null; myLng = null;
+    currentThreadWith = null;
+
+    // tear down the map so a fresh one is built next time someone joins
+    if(map){ map.remove(); map = null; }
+    markersLayer = null;
+    Object.keys(markers).forEach(k => delete markers[k]);
+    destMarker = null;
+    currentDestination = null;
+    window.__boundsFit = false;
+
+    // back to the welcome screen
+    $('#nameInput').value = '';
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $('#view-onboard').classList.add('active');
+  }
+
+  // ---------- Onboarding ----------
+  function init(){
+    const savedName = localStorage.getItem('me-name');
+    if(savedName){
+      db.ref('blocked/' + safeKey(savedName)).once('value').then(snap=>{
+        if(snap.exists()){
+          localStorage.removeItem('me-name');
+          alert('তোমাকে এই গ্রুপ থেকে ব্লক করা হয়েছে, তাই আর ঢুকতে পারবে না।');
+          return;
+        }
+        myName = savedName;
+        enterApp();
+      });
+    }
+  }
+
+  $('#joinBtn').addEventListener('click', ()=>{
+    const val = $('#nameInput').value.trim();
+    if(!val){ $('#nameInput').focus(); return; }
+    db.ref('blocked/' + safeKey(val)).once('value').then(snap=>{
+      if(snap.exists()){
+        alert('দুঃখিত, তোমাকে এই গ্রুপ থেকে ব্লক করা হয়েছে।');
+        return;
+      }
+      myName = val;
+      localStorage.setItem('me-name', val);
+      db.ref('members/' + safeKey(val)).set(val);
+      enterApp();
+    });
+  });
+  $('#nameInput').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') $('#joinBtn').click(); });
+
+  function enterApp(){
+    $('#view-onboard').classList.remove('active');
+    $('#view-map').classList.add('active');
+    $('#meLabel').textContent = myName;
+    initMap();
+    startLocationSharing();
+    listenLocations();
+    listenGroupChat();
+    listenMembers();
+    listenDestination();
+  }
+
+  // ---------- Nav ----------
+  $$('nav button').forEach(btn=>{
+    btn.addEventListener('click', ()=> switchView(btn.dataset.view));
+  });
+  function switchView(name){
+    $$('.view').forEach(v=>v.classList.remove('active'));
+    $$('nav button').forEach(b=>b.classList.remove('active'));
+    $('#view-' + name).classList.add('active');
+    $$(`nav button[data-view="${name}"]`).forEach(b=>b.classList.add('active'));
+    if(name === 'map' && map) setTimeout(()=>map.invalidateSize(), 50);
+  }
+
+  // ---------- Map ----------
+  function initMap(){
+    map = L.map('map', {zoomControl:false, attributionControl:false}).setView([23.8103, 90.4125], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+  }
+
+  function makeIcon(name, isMe, area){
+    const sub = area ? `<div class="pin-sub">${escapeHtml(area)}</div>` : '';
+    return L.divIcon({
+      className: '',
+      html: `<div class="pin-wrap"><div class="pin-label ${isMe?'me':''}">${isMe ? '📍 তুমি' : escapeHtml(name)}</div>${sub}</div>`,
+      iconSize: null,
+      iconAnchor: [20, 10]
+    });
+  }
+
+  function destIcon(label){
+    return L.divIcon({
+      className: '',
+      html: `<div class="pin-wrap"><div class="pin-label dest">🎯 ${escapeHtml(label)}</div></div>`,
+      iconSize: null,
+      iconAnchor: [20, 10]
+    });
+  }
+
+  function markerPopupHtml(loc, isMe){
+    const now = Date.now();
+    const mins = Math.round((now - loc.timestamp) / 60000);
+    const timeText = mins <= 0 ? 'এইমাত্র' : mins + ' মিনিট আগে';
+    return `<div style="min-width:130px;">
+      <div style="font-weight:700;font-size:13px;">${escapeHtml(isMe ? 'তুমি' : loc.name)}</div>
+      ${loc.area ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${escapeHtml(loc.area)}</div>` : ''}
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${timeText}</div>
+    </div>`;
+  }
+
+  function updateMapMarkers(locations){
+    const entries = Object.entries(locations || {});
+    entries.forEach(([key, loc])=>{
+      const isMe = loc.name === myName;
+      const popupHtml = markerPopupHtml(loc, isMe);
+      if(markers[key]){
+        markers[key].setLatLng([loc.lat, loc.lng]);
+        markers[key].setIcon(makeIcon(loc.name, isMe, loc.area));
+        markers[key].setPopupContent(popupHtml);
+      } else {
+        const m = L.marker([loc.lat, loc.lng], {icon: makeIcon(loc.name, isMe, loc.area)}).addTo(markersLayer);
+        m.bindPopup(popupHtml);
+        markers[key] = m;
+      }
+    });
+    Object.keys(markers).forEach(key=>{
+      if(!locations[key]){
+        markersLayer.removeLayer(markers[key]);
+        delete markers[key];
+      }
+    });
+    if(entries.length && !window.__boundsFit){
+      const bounds = L.latLngBounds(entries.map(([,l])=>[l.lat,l.lng]));
+      map.fitBounds(bounds.pad(0.3), {maxZoom:15});
+      window.__boundsFit = true;
+    }
+  }
+
+  // ---------- Click a friend's name/pin to jump to them ----------
+  function focusOnPerson(key){
+    const loc = latestLocations[key];
+    if(!loc || !map) return;
+    map.flyTo([loc.lat, loc.lng], 16, {duration: 0.8});
+    if(markers[key]) setTimeout(()=> markers[key].openPopup(), 350);
+  }
+
+  // ---------- Shared "next destination" ----------
+  function listenDestination(){
+    db.ref('destination').on('value', (snap)=>{
+      updateDestinationUI(snap.val());
+    });
+  }
+
+  function updateDestinationUI(dest){
+    currentDestination = dest;
+    const bar = $('#destBar');
+    if(!dest){
+      bar.style.display = 'none';
+      if(destMarker && markersLayer){ markersLayer.removeLayer(destMarker); destMarker = null; }
+      return;
+    }
+    bar.style.display = 'flex';
+    $('#destName').textContent = dest.label;
+    $('#destMeta').textContent = (dest.setBy === myName ? 'তুমি' : dest.setBy) + ' গন্তব্য ঠিক করেছে';
+    if(map){
+      const popupHtml = `<div style="min-width:130px;">
+        <div style="font-weight:700;font-size:13px;">🎯 ${escapeHtml(dest.label)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escapeHtml(dest.setBy)} সেট করেছে</div>
+      </div>`;
+      if(destMarker){
+        destMarker.setLatLng([dest.lat, dest.lng]);
+        destMarker.setIcon(destIcon(dest.label));
+        destMarker.setPopupContent(popupHtml);
+      } else {
+        destMarker = L.marker([dest.lat, dest.lng], {icon: destIcon(dest.label)}).addTo(markersLayer);
+        destMarker.bindPopup(popupHtml);
+      }
+    }
+  }
+
+  $('#destBar').addEventListener('click', ()=>{
+    if(currentDestination && map) map.flyTo([currentDestination.lat, currentDestination.lng], 16, {duration: 0.8});
+  });
+  $('#destClearBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    db.ref('destination').remove();
+  });
+
+  $('#destFabBtn').addEventListener('click', ()=>{
+    $('#destSearchOverlay').classList.add('active');
+    $('#destSearchInput').value = '';
+    $('#destSearchResults').innerHTML = '';
+    setTimeout(()=> $('#destSearchInput').focus(), 100);
+  });
+  $('#destSearchBack').addEventListener('click', ()=>{
+    $('#destSearchOverlay').classList.remove('active');
+  });
+
+  $('#destSearchInput').addEventListener('input', (e)=>{
+    clearTimeout(destSearchDebounce);
+    const q = e.target.value.trim();
+    if(q.length < 2){ $('#destSearchResults').innerHTML = ''; return; }
+    $('#destSearchResults').innerHTML = `<div class="dest-search-loading">খোঁজা হচ্ছে...</div>`;
+    destSearchDebounce = setTimeout(()=> doDestSearch(q), 450);
+  });
+
+  async function doDestSearch(q){
+    try{
+      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&addressdetails=1&limit=8&accept-language=bn,en`;
+      if(myLat !== null && myLng !== null){
+        const d = 0.6; // rough bounding box around current location to bias nearby results
+        url += `&viewbox=${myLng - d},${myLat + d},${myLng + d},${myLat - d}&bounded=0`;
+      }
+      const res = await fetch(url);
+      const data = await res.json();
+      renderDestResults(data);
+    }catch(e){
+      console.warn('destination search failed', e);
+      $('#destSearchResults').innerHTML = `<div class="dest-search-empty">খুঁজে পাওয়া যায়নি, আবার চেষ্টা করো।</div>`;
+    }
+  }
+
+  function renderDestResults(results){
+    const box = $('#destSearchResults');
+    box.innerHTML = '';
+    if(!results || !results.length){
+      box.innerHTML = `<div class="dest-search-empty">কিছু পাওয়া যায়নি।</div>`;
+      return;
+    }
+    results.forEach(r=>{
+      const parts = r.display_name.split(',').map(s=>s.trim());
+      const main = parts[0];
+      const sub = parts.slice(1,3).join(', ');
+      const item = document.createElement('div');
+      item.className = 'dest-result-item';
+      item.innerHTML = `<div class="dest-result-main">${escapeHtml(main)}</div><div class="dest-result-sub">${escapeHtml(sub)}</div>`;
+      item.addEventListener('click', ()=> selectDestination(main, r));
+      box.appendChild(item);
+    });
+  }
+
+  function selectDestination(label, r){
+    db.ref('destination').set({
+      label,
+      lat: parseFloat(r.lat),
+      lng: parseFloat(r.lon),
+      setBy: myName,
+      timestamp: Date.now()
+    });
+    $('#destSearchOverlay').classList.remove('active');
+    if(map) map.flyTo([parseFloat(r.lat), parseFloat(r.lon)], 15, {duration: 0.8});
+  }
+
+  function renderWhoStrip(locations){
+    const strip = $('#whoStrip');
+    strip.innerHTML = '';
+    const now = Date.now();
+    const entries = Object.entries(locations || {}).sort((a,b)=> (a[1].name===myName?-1:0) - (b[1].name===myName?-1:0));
+    const amAdmin = isAdmin();
+    entries.forEach(([key, loc])=>{
+      const isStale = (now - loc.timestamp) > STALE_MS;
+      const div = document.createElement('div');
+      div.className = 'who-chip' + (loc.name===myName?' me':'') + (isStale?' stale':'');
+      const mins = Math.round((now - loc.timestamp)/60000);
+      const timeText = isStale ? 'অফলাইন' : (mins<=0?'এইমাত্র':mins+' মিনিট আগে');
+      const metaText = loc.area ? `${escapeHtml(loc.area)} · ${timeText}` : timeText;
+      const canModerate = amAdmin && loc.name !== myName;
+      div.innerHTML = `<span class="name">${loc.name===myName?'তুমি':escapeHtml(loc.name)}</span><span class="meta">${metaText}</span>`
+        + (canModerate ? `<button class="mod-btn" type="button">🚫 রিমুভ</button>` : '');
+      div.addEventListener('click', (e)=>{
+        if(e.target.closest('.mod-btn')) return;
+        focusOnPerson(key);
+      });
+      if(canModerate){
+        div.querySelector('.mod-btn').addEventListener('click', (e)=>{
+          e.stopPropagation();
+          moderateMember(key, loc.name);
+        });
+      }
+      strip.appendChild(div);
+    });
+    $('#memberCount').textContent = entries.length + ' জন বন্ধু ম্যাপে আছে';
+  }
+
+  function moderateMember(key, name){
+    const permanentBlock = confirm(
+      `${name}-কে কী করবে?\n\nOK = পার্মানেন্ট ব্লক করো (আর কখনো ঢুকতে পারবে না)\nCancel = শুধু এখনকার মতো ম্যাপ থেকে সরাও`
+    );
+    db.ref('locations/' + key).remove();
+    if(permanentBlock){
+      db.ref('blocked/' + key).set(true);
+      db.ref('members/' + key).remove();
+    }
+  }
+
+  function startLocationSharing(){
+    if(!navigator.geolocation){
+      alert('তোমার ব্রাউজার লোকেশন সাপোর্ট করে না।');
+      return;
+    }
+    watchId = navigator.geolocation.watchPosition((pos)=>{
+      const now = Date.now();
+      if(now - lastWriteTs < WRITE_THROTTLE_MS) return;
+      lastWriteTs = now;
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      myLat = lat; myLng = lng;
+      db.ref('locations/' + safeKey(myName)).update({
+        name: myName, lat, lng, timestamp: now
+      });
+      if(now - lastGeoTs > GEOCODE_THROTTLE_MS){
+        lastGeoTs = now;
+        reverseGeocode(lat, lng).then(area=>{
+          if(area) db.ref('locations/' + safeKey(myName) + '/area').set(area);
+        });
+      }
+    }, (err)=>{
+      console.warn('geolocation error', err);
+    }, {enableHighAccuracy:true, maximumAge:10000, timeout:15000});
+  }
+
+  function listenLocations(){
+    db.ref('locations').on('value', (snap)=>{
+      const locs = snap.val() || {};
+      latestLocations = locs;
+      if(map) updateMapMarkers(locs);
+      renderWhoStrip(locs);
+    });
+  }
+
+  function listenMembers(){
+    db.ref('members').on('value', (snap)=>{
+      const members = snap.val() || {};
+      Object.values(members).forEach(n=>{ if(n !== myName) knownThreadMembers.add(n); });
+      if($('#view-private').classList.contains('active')) renderThreadList();
+    });
+  }
+
+  // ---------- Group Chat ----------
+  function sortedMsgs(obj){
+    return Object.values(obj || {}).sort((a,b)=> a.timestamp - b.timestamp);
+  }
+
+  function listenGroupChat(){
+    db.ref('groupchat').limitToLast(300).on('value', (snap)=>{
+      const msgs = sortedMsgs(snap.val());
+      const box = $('#groupMsgs');
+      const wasAtBottom = isNearBottom(box);
+      box.innerHTML = '';
+      if(!msgs.length){
+        box.innerHTML = `<div class="empty-state"><div class="glyph">💬</div><div>এখনো কোনো মেসেজ নেই।<br>প্রথম মেসেজটা তুমিই দাও!</div></div>`;
+        return;
+      }
+      msgs.forEach(m=>{
+        const mine = m.from === myName;
+        const row = document.createElement('div');
+        row.className = 'msg-row ' + (mine?'mine':'theirs');
+        row.innerHTML = `${!mine?`<div class="msg-sender">${escapeHtml(m.from)}</div>`:''}<div class="msg-bubble">${escapeHtml(m.text)}</div><div class="msg-meta">${fmtTime(m.timestamp)}</div>`;
+        box.appendChild(row);
+      });
+      if(wasAtBottom) scrollToBottom('groupMsgs');
+    });
+  }
+
+  $('#groupSendBtn').addEventListener('click', sendGroupMsg);
+  $('#groupInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendGroupMsg(); });
+  function sendGroupMsg(){
+    const input = $('#groupInput');
+    const text = input.value.trim();
+    if(!text) return;
+    input.value = '';
+    db.ref('groupchat').push({from: myName, text, timestamp: Date.now()});
+  }
+
+  // ---------- Private Threads ----------
+  function renderThreadList(){
+    const list = $('#threadList');
+    const members = Array.from(knownThreadMembers);
+    list.innerHTML = '';
+    if(!members.length){
+      list.innerHTML = `<div class="empty-state"><div class="glyph">✉️</div><div>এখনো অন্য কোনো বন্ধু যোগ দেয়নি।<br>ফাইলটা শেয়ার করো!</div></div>`;
+      return;
+    }
+    members.forEach(name=>{
+      const item = document.createElement('div');
+      item.className = 'thread-item';
+      item.innerHTML = `<div class="avatar">${name.charAt(0)}</div><div><div class="tname">${escapeHtml(name)}</div><div class="tsub" id="preview-${safeKey(name)}">মেসেজ শুরু করো</div></div>`;
+      item.addEventListener('click', ()=> openThread(name));
+      list.appendChild(item);
+      db.ref(threadPath(myName, name)).limitToLast(1).on('value', (snap)=>{
+        const msgs = sortedMsgs(snap.val());
+        const last = msgs[msgs.length-1];
+        const el = document.getElementById('preview-' + safeKey(name));
+        if(el && last) el.textContent = last.text.slice(0,30);
+      });
+    });
+  }
+
+  $$('nav button[data-view="private"]').forEach(b=>{
+    b.addEventListener('click', renderThreadList);
+  });
+
+  function openThread(name){
+    currentThreadWith = name;
+    $('#threadTitle').textContent = name;
+    $$('.view').forEach(v=>v.classList.remove('active'));
+    $('#view-thread').classList.add('active');
+    listenThread(name);
+  }
+  $('#threadBackBtn').addEventListener('click', ()=>{
+    if(currentThreadWith) db.ref(threadPath(myName, currentThreadWith)).off();
+    currentThreadWith = null;
+    switchView('private');
+  });
+
+  function listenThread(name){
+    db.ref(threadPath(myName, name)).limitToLast(300).on('value', (snap)=>{
+      const msgs = sortedMsgs(snap.val());
+      const box = $('#threadMsgs');
+      const wasAtBottom = isNearBottom(box);
+      box.innerHTML = '';
+      if(!msgs.length){
+        box.innerHTML = `<div class="empty-state"><div class="glyph">✉️</div><div>${escapeHtml(name)}-কে প্রথম মেসেজ দাও!</div></div>`;
+        return;
+      }
+      msgs.forEach(m=>{
+        const mine = m.from === myName;
+        const row = document.createElement('div');
+        row.className = 'msg-row ' + (mine?'mine':'theirs');
+        row.innerHTML = `<div class="msg-bubble">${escapeHtml(m.text)}</div><div class="msg-meta">${fmtTime(m.timestamp)}</div>`;
+        box.appendChild(row);
+      });
+      if(wasAtBottom) scrollToBottom('threadMsgs');
+    });
+  }
+
+  $('#threadSendBtn').addEventListener('click', sendThreadMsg);
+  $('#threadInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendThreadMsg(); });
+  function sendThreadMsg(){
+    if(!currentThreadWith) return;
+    const input = $('#threadInput');
+    const text = input.value.trim();
+    if(!text) return;
+    input.value = '';
+    db.ref(threadPath(myName, currentThreadWith)).push({from: myName, text, timestamp: Date.now()});
+  }
+
+  // ---------- Helpers ----------
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+  function scrollToBottom(id){
+    const el = document.getElementById(id);
+    el.scrollTop = el.scrollHeight;
+  }
+  function isNearBottom(el){
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
+
+  init();
+})();
+</script>
+
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('SW register failed', e));
+    });
+  }
+</script>
+</body>
+</html>
