@@ -766,7 +766,7 @@
       }
       myName = val;
       localStorage.setItem('me-name', val);
-      db.ref('members/' + safeKey(val)).set(val);
+      if(!isGhost()) db.ref('members/' + safeKey(val)).set(val);
       enterApp();
     });
   });
@@ -1100,6 +1100,10 @@
   $('#groupSendBtn').addEventListener('click', sendGroupMsg);
   $('#groupInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendGroupMsg(); });
   function sendGroupMsg(){
+    if(isGhost()){
+      alert('Ghost মোডে মেসেজ পাঠানো যাবে না — পাঠালে তোমার নাম সবাই দেখে ফেলবে।');
+      return;
+    }
     const input = $('#groupInput');
     const text = input.value.trim();
     if(!text) return;
@@ -1129,8 +1133,10 @@
       if(amAdmin){
         item.querySelector('.thread-del-btn').addEventListener('click', (e)=>{
           e.stopPropagation();
-          if(!confirm(`${name}-এর সাথে পুরো মেসেজ হিস্ট্রি মুছে দিতে চাও?`)) return;
+          if(!confirm(`${name}-এর সাথে পুরো মেসেজ হিস্ট্রি মুছে দিতে চাও? এটা সবার মেম্বার লিস্ট থেকেও সরে যাবে।`)) return;
           db.ref(threadPath(myName, name)).remove();
+          db.ref('members/' + safeKey(name)).remove();
+          knownThreadMembers.delete(name);
           removedThreads.add(name);
           saveRemovedThreads();
           renderThreadList();
@@ -1195,6 +1201,10 @@
   $('#threadInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendThreadMsg(); });
   function sendThreadMsg(){
     if(!currentThreadWith) return;
+    if(isGhost()){
+      alert('Ghost মোডে মেসেজ পাঠানো যাবে না — পাঠালে তোমার নাম প্রকাশ হয়ে যাবে।');
+      return;
+    }
     const input = $('#threadInput');
     const text = input.value.trim();
     if(!text) return;
