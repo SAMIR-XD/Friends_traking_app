@@ -1,6 +1,6 @@
 {
-  "name": "একসাথে ঘুরি — বন্ধু ম্যাপ",
-  "short_name": "বন্ধু ম্যাপ",
+  "name": "Live Locator",
+  "short_name": "Live Locator",
   "description": "বন্ধুদের সাথে লাইভ লোকেশন শেয়ার, গন্তব্য ঠিক করা আর চ্যাট করার অ্যাপ।",
   "start_url": "./index.html",
   "scope": "./",

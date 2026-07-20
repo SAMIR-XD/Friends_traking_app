@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bondhu-map-v6';
+const CACHE_NAME = 'bondhu-map-v8';
 const APP_SHELL = [
   './index.html',
   './manifest.json',

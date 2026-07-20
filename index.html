@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>বন্ধু ম্যাপ</title>
+<title>Live Locator</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="বন্ধু ম্যাপ">
+<meta name="apple-mobile-web-app-title" content="Live Locator">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
@@ -121,6 +121,25 @@
 
   /* Onboarding */
   #view-onboard.active{justify-content:center;align-items:center;padding:28px;}
+  .live-clock{
+    position:absolute;
+    top:22px; left:0; right:0;
+    text-align:center;
+    pointer-events:none;
+  }
+  .live-clock .lc-time{
+    font-family:'Baloo Da 2',sans-serif;
+    font-size:34px;
+    font-weight:700;
+    letter-spacing:1px;
+    color:var(--paper);
+    text-shadow:0 2px 12px rgba(0,0,0,0.4);
+  }
+  .live-clock .lc-date{
+    margin-top:2px;
+    font-size:13px;
+    color:var(--muted);
+  }
   .onboard-card{
     width:100%;
     text-align:center;
@@ -485,6 +504,10 @@
 
   <!-- ONBOARDING -->
   <div class="view active" id="view-onboard">
+    <div class="live-clock" id="liveClock">
+      <div class="lc-time" id="lcTime">--:--</div>
+      <div class="lc-date" id="lcDate">…</div>
+    </div>
     <div class="onboard-card">
       <div class="glyph">🧭</div>
       <div class="welcome-line">Welcome dear brother 👋</div>
@@ -658,6 +681,17 @@
   function safeKey(name){
     return name.replace(/[.#$\[\]\/]/g, '_');
   }
+
+  // ---------- Live clock (onboarding screen) ----------
+  function tickLiveClock(){
+    const d = new Date();
+    const timeEl = document.getElementById('lcTime');
+    const dateEl = document.getElementById('lcDate');
+    if(timeEl) timeEl.textContent = d.toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    if(dateEl) dateEl.textContent = d.toLocaleDateString('bn-BD', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  }
+  tickLiveClock();
+  setInterval(tickLiveClock, 1000);
   function threadPath(a,b){
     return 'private/' + [safeKey(a), safeKey(b)].sort().join('__');
   }
@@ -1124,12 +1158,22 @@
     members.forEach(name=>{
       const item = document.createElement('div');
       item.className = 'thread-item';
-      item.innerHTML = `<div class="avatar">${name.charAt(0)}</div><div style="flex:1;min-width:0;"><div class="tname">${escapeHtml(name)}</div><div class="tsub" id="preview-${safeKey(name)}">মেসেজ শুরু করো</div></div>`
+      const key = safeKey(name);
+      const hasLoc = !!latestLocations[key];
+      item.innerHTML = `<div class="avatar">${name.charAt(0)}</div><div style="flex:1;min-width:0;"><div class="tname">${escapeHtml(name)}</div><div class="tsub" id="preview-${key}">মেসেজ শুরু করো</div></div>`
+        + (hasLoc ? `<button class="mod-btn locate-btn" type="button" title="ম্যাপে দেখাও">📍</button>` : '')
         + (amAdmin ? `<button class="mod-btn thread-del-btn" type="button">🚫 রিমুভ</button>` : '');
       item.addEventListener('click', (e)=>{
-        if(e.target.closest('.thread-del-btn')) return;
+        if(e.target.closest('.thread-del-btn') || e.target.closest('.locate-btn')) return;
         openThread(name);
       });
+      if(hasLoc){
+        item.querySelector('.locate-btn').addEventListener('click', (e)=>{
+          e.stopPropagation();
+          switchView('map');
+          setTimeout(()=> focusOnPerson(key), 250);
+        });
+      }
       if(amAdmin){
         item.querySelector('.thread-del-btn').addEventListener('click', (e)=>{
           e.stopPropagation();
