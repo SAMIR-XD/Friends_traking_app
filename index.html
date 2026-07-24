@@ -740,6 +740,8 @@
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
     }
+    if(geoRetryTimer){ clearTimeout(geoRetryTimer); geoRetryTimer = null; }
+    if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
 
     // remove my pin from everyone's map
     if(myName){
@@ -1055,12 +1057,30 @@
     }
   }
 
+  let wakeLock = null;
+  let geoRetryTimer = null;
+
+  async function requestWakeLock(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+      }
+    }catch(e){ /* wake lock not available/allowed — fine, tracking still works while app is open */ }
+  }
+
   function startLocationSharing(){
     if(!navigator.geolocation){
       alert('তোমার ব্রাউজার লোকেশন সাপোর্ট করে না।');
       return;
     }
+    requestWakeLock();
+    if(watchId !== null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
     watchId = navigator.geolocation.watchPosition((pos)=>{
+      if(geoRetryTimer){ clearTimeout(geoRetryTimer); geoRetryTimer = null; }
       const now = Date.now();
       if(now - lastWriteTs < WRITE_THROTTLE_MS) return;
       lastWriteTs = now;
@@ -1079,8 +1099,25 @@
       }
     }, (err)=>{
       console.warn('geolocation error', err);
-    }, {enableHighAccuracy:true, maximumAge:10000, timeout:15000});
+      // self-heal: browsers sometimes drop watchPosition (screen off/on, GPS hiccup).
+      // Restart it automatically instead of leaving the user's pin stuck/stale.
+      if(!geoRetryTimer && myName){
+        geoRetryTimer = setTimeout(()=>{
+          geoRetryTimer = null;
+          if(myName) startLocationSharing();
+        }, 4000);
+      }
+    }, {enableHighAccuracy:true, maximumAge:8000, timeout:15000});
   }
+
+  // If the tab/app comes back to the foreground (screen turned back on,
+  // switched back from another app), make sure tracking is still alive.
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible' && myName){
+      requestWakeLock();
+      startLocationSharing();
+    }
+  });
 
   function listenLocations(){
     db.ref('locations').on('value', (snap)=>{
